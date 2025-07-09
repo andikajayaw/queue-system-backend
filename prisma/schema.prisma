@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(STAFF)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  servedQueues Queue[] @relation("ServedBy")
+
+  @@map("users")
+}
+
+model Queue {
+  id              String      @id @default(cuid())
+  queueNumber     String      @unique
+  type            QueueType
+  status          QueueStatus @default(WAITING)
+  customerName    String?
+  phoneNumber     String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  calledAt        DateTime?
+  completedAt     DateTime?
+  
+  servedById      String?
+  servedBy        User?       @relation("ServedBy", fields: [servedById], references: [id])
+  
+  serviceStartedAt DateTime?
+  
+  serviceDuration Int?       // dalam detik
+
+  @@map("queues")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum QueueType {
+  RESERVATION
+  WALK_IN
+}
+
+enum QueueStatus {
+  WAITING
+  CALLED
+  SERVING
+  COMPLETED
+  CANCELLED
+}

@@ -169,12 +169,14 @@ export class DisplayGateway
   // Method to broadcast new queue creation
   async broadcastNewQueue(queueData: any) {
     try {
-      const [statistics, nextWaiting] = await Promise.all([
+      const [currentCalled, statistics, nextWaiting] = await Promise.all([
+        this.displayService.getCurrentCalledQueues(),
         this.displayService.getQueueStatistics(),
         this.displayService.getNextWaitingQueues(5),
       ]);
       this.server.emit('newQueue', {
         queue: queueData,
+        currentCalled,
         statistics,
         nextWaiting,
       });

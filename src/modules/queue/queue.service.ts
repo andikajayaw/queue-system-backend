@@ -291,7 +291,7 @@ export class QueueService {
             status: QueueStatus.COMPLETED,
             queueDate: {
               gte: todayStart,
-              lt: todayEnd,
+              lte: todayEnd,
             },
           },
         },

@@ -14,6 +14,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req) => {
+          console.log('req.cookies:', req?.cookies); // 👈 log cookie
           // Ambil token dari cookie 'refresh_token'
           return req?.cookies?.refresh_token;
         },

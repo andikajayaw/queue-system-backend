@@ -34,12 +34,14 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.login(loginDto);
+    console.log('Setting cookie for refresh_token:', result.refreshToken); // debug
+
     // Set cookie untuk refresh token
     res.cookie('refresh_token', result.refreshToken, {
       httpOnly: true,
-      // secure: true,
-      sameSite: 'strict',
-      maxAge: 5 * 60 * 1000, // 5 menit
+      secure: false, // false kalau masih lokal tanpa HTTPS
+      sameSite: 'lax', // lebih fleksibel daripada 'strict'
+      maxAge: 5 * 60 * 1000,
     });
 
     // return this.authService.login(loginDto);
@@ -47,6 +49,7 @@ export class AuthController {
       message: result.message,
       accessToken: result.accessToken,
       user: result.user,
+      refresh_token: result.refreshToken,
     };
   }
 
@@ -79,8 +82,26 @@ export class AuthController {
 
   @Post('refresh-token')
   @UseGuards(JwtRefreshGuard) // Guard untuk validasi refresh token (custom)
-  async refreshToken(@Request() req) {
-    console.log('refresh', req);
-    return this.authService.refreshAccessToken(req.user.id);
+  async refreshToken(
+    @Request() req,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    console.log('user dari guard:', req.user);
+    const result = await this.authService.refreshAccessToken(req.user.id);
+
+    // Set refresh token baru di cookie
+    res.cookie('refresh_token', result.refreshToken, {
+      httpOnly: true,
+      secure: false, // false kalau masih lokal tanpa HTTPS
+      sameSite: 'lax', // lebih fleksibel daripada 'strict'
+      maxAge: 5 * 60 * 1000,
+    });
+
+    return {
+      message: result.message,
+      accessToken: result.accessToken,
+      user: result.user,
+      refresh_token: result.refreshToken,
+    };
   }
 }

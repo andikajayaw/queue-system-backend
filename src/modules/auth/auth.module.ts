@@ -8,6 +8,8 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JwtRefreshGuard } from './guards/jwt-auth/jwt-refresh-guard';
+import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 
 @Module({
   imports: [
@@ -22,7 +24,14 @@ import { PrismaService } from '../../../prisma/prisma.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, PrismaService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    LocalStrategy,
+    PrismaService,
+    JwtRefreshStrategy,
+    JwtRefreshGuard,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

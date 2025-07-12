@@ -18,6 +18,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  lastLoginAt   DateTime? // Tambahkan ini
+  lastLogoutAt  DateTime? // Tambahkan ini
+
   servedQueues Queue[] @relation("ServedBy")
 
   @@map("users")
@@ -25,7 +28,9 @@ model User {
 
 model Queue {
   id              String      @id @default(cuid())
-  queueNumber     String      @unique
+  queueNumber     String
+  queueDate       DateTime    @default(now())
+
   type            QueueType
   status          QueueStatus @default(WAITING)
   customerName    String?
@@ -39,9 +44,9 @@ model Queue {
   servedBy        User?       @relation("ServedBy", fields: [servedById], references: [id])
   
   serviceStartedAt DateTime?
-  
-  serviceDuration Int?       // dalam detik
+  serviceDuration Int?
 
+  @@unique([queueNumber, queueDate])
   @@map("queues")
 }
 

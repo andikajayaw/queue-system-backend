@@ -5,11 +5,14 @@ import {
   Get,
   UseGuards,
   Request,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth/jwt-auth.guard';
+import { JwtRefreshGuard } from './guards/jwt-auth/jwt-refresh-guard';
 import { RolesGuard } from './guards/roles/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { Role } from '@prisma/client';
@@ -26,8 +29,32 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(loginDto);
+    // Set cookie untuk refresh token
+    res.cookie('refresh_token', result.refreshToken, {
+      httpOnly: true,
+      // secure: true,
+      sameSite: 'strict',
+      maxAge: 5 * 60 * 1000, // 5 menit
+    });
+
+    // return this.authService.login(loginDto);
+    return {
+      message: result.message,
+      accessToken: result.accessToken,
+      user: result.user,
+    };
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logout(@Request() req, @Res({ passthrough: true }) res: Response) {
+    res.clearCookie('refresh_token');
+    return this.authService.logout(req.user.id);
   }
 
   @Get('profile')
@@ -48,5 +75,12 @@ export class AuthController {
   @Roles(Role.ADMIN, Role.STAFF)
   testStaff() {
     return { message: 'Admin dan Staff bisa akses endpoint ini' };
+  }
+
+  @Post('refresh-token')
+  @UseGuards(JwtRefreshGuard) // Guard untuk validasi refresh token (custom)
+  async refreshToken(@Request() req) {
+    console.log('refresh', req);
+    return this.authService.refreshAccessToken(req.user.id);
   }
 }

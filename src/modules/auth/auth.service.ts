@@ -9,12 +9,14 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import * as bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
+import { ConfigService } from '@nestjs/config'; // ✅ import dulu
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -84,11 +86,26 @@ export class AuthService {
       role: user.role,
     };
 
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_SECRET'),
+      expiresIn: '5m', // atau berapa pun kamu inginkan
+    });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_REFRESH_SECRET'),
+      expiresIn: '5m', // atau berapa pun kamu inginkan
+    });
+
+    // Update lastLoginAt
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     return {
       message: 'Login berhasil',
       accessToken,
+      refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -97,6 +114,24 @@ export class AuthService {
         role: user.role,
       },
     };
+  }
+
+  async logout(id: string) {
+    if (!id) {
+      throw new UnauthorizedException('User ID tidak tersedia untuk logout.');
+    }
+    try {
+      await this.prisma.user.update({
+        where: { id },
+        data: {
+          lastLogoutAt: new Date(),
+        },
+      });
+
+      return { message: 'Logout berhasil' };
+    } catch (error) {
+      console.log('logout', error);
+    }
   }
 
   async getProfile(userId: string) {
@@ -135,6 +170,44 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
+    };
+  }
+
+  async getActiveStaff() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: 'STAFF',
+        lastLoginAt: { not: null },
+      },
+    });
+
+    return users.filter(
+      (u) =>
+        u.lastLoginAt !== null &&
+        (!u.lastLogoutAt || u.lastLoginAt > u.lastLogoutAt),
+    );
+  }
+
+  async refreshAccessToken(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      throw new UnauthorizedException('User tidak ditemukan');
+    }
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_SECRET'),
+      expiresIn: '5m', // atau berapa pun kamu inginkan
+    });
+
+    return {
+      accessToken,
     };
   }
 }

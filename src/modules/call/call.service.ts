@@ -8,6 +8,7 @@ import { QueueService } from '../queue/queue.service';
 import { QueueStatus } from '@prisma/client';
 import { CallGateway } from './call/call.gateway';
 import { DisplayGateway } from '../display/display/display.gateway';
+import { startOfDay, endOfDay } from 'date-fns';
 
 export interface TTSResponse {
   success: boolean;
@@ -119,6 +120,7 @@ export class CallService {
     const nextQueue = await this.queueService.getNextQueueByPriority();
 
     if (!nextQueue) {
+      console.warn('Tidak ada antrian waiting yang valid untuk dipanggil.');
       return {
         success: false,
         message: 'Tidak ada antrian yang menunggu',
@@ -130,16 +132,94 @@ export class CallService {
       };
     }
 
-    return this.callQueue(nextQueue.id, staffId);
+    // return this.callQueue(nextQueue.id, staffId);
+    try {
+      // Lindungi proses update status queue agar atomic
+      const updatedQueue = await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.queue.findUnique({
+          where: { id: nextQueue.id },
+          select: { status: true },
+        });
+
+        if (!existing || existing.status !== QueueStatus.WAITING) {
+          throw new Error('Queue sudah dipanggil oleh petugas lain');
+        }
+
+        return await tx.queue.update({
+          where: { id: nextQueue.id },
+          data: {
+            status: QueueStatus.CALLED,
+            servedById: staffId,
+            calledAt: new Date(),
+          },
+          include: {
+            servedBy: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+              },
+            },
+          },
+        });
+      });
+
+      // Broadcast seperti biasa
+      const ttsText = this.generateTTSText(updatedQueue.queueNumber);
+
+      const queueData = {
+        queueId: updatedQueue.id,
+        queueNumber: updatedQueue.queueNumber,
+        status: updatedQueue.status,
+        customerName: updatedQueue.customerName,
+        type: updatedQueue.type,
+        calledAt: updatedQueue.calledAt,
+        ttsText,
+        servedBy: updatedQueue.servedBy,
+      };
+
+      this.callGateway.broadcastQueueCall(queueData);
+      await this.displayGateway.broadcastQueueCalled(queueData);
+
+      return {
+        success: true,
+        message: `Nomor antrian ${updatedQueue.queueNumber} berhasil dipanggil`,
+        data: {
+          ...queueData,
+          text: ttsText,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    } catch (err) {
+      return {
+        success: false,
+        message:
+          'Antrian sudah dipanggil oleh petugas lain. Coba klik tombol lagi.',
+        data: {
+          queueNumber: '',
+          text: '',
+          timestamp: new Date().toISOString(),
+        },
+      };
+    }
   }
 
   async callQueueByNumber(
     queueNumber: string,
     staffId: string,
   ): Promise<TTSResponse> {
-    const queue = await this.prisma.queue.findUnique({
-      where: { queueNumber },
+    const queue = await this.prisma.queue.findFirst({
+      where: {
+        queueNumber,
+        queueDate: {
+          gte: startOfDay(new Date()),
+          lt: endOfDay(new Date()),
+        },
+      },
     });
+    // const queue = await this.prisma.queue.findUnique({
+    //   where: { queueNumber, queueDate: new Date(), },
+    // });
 
     if (!queue) {
       throw new NotFoundException('Nomor antrian tidak ditemukan');
@@ -213,11 +293,11 @@ export class CallService {
       throw new NotFoundException('Antrian tidak ditemukan');
     }
 
-    if (queue.status !== QueueStatus.SERVING) {
-      throw new BadRequestException(
-        'Antrian harus dalam status dilayani terlebih dahulu',
-      );
-    }
+    // if (queue.status !== QueueStatus.SERVING) {
+    //   throw new BadRequestException(
+    //     'Antrian harus dalam status dilayani terlebih dahulu',
+    //   );
+    // }
 
     // Calculate service duration
     const serviceStarted = queue.serviceStartedAt;
@@ -272,14 +352,17 @@ export class CallService {
 
     if (!queue) {
       throw new NotFoundException('Antrian tidak ditemukan');
+      return;
     }
 
     if (queue.status === 'COMPLETED' || queue.status === 'CANCELLED') {
       throw new BadRequestException('Queue is already completed or cancelled');
+      return;
     }
 
     if (queue.servedById && queue.servedById !== staffId) {
       throw new BadRequestException('You are not assigned to this queue');
+      return;
     }
 
     const updatedQueue = await this.prisma.queue.update({
@@ -359,14 +442,20 @@ export class CallService {
         timestamp: new Date().toISOString(),
       },
     };
-
     return response;
   }
 
   async getCurrentCalls() {
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
+
     const calledQueues = await this.prisma.queue.findMany({
       where: {
-        status: { in: [QueueStatus.CALLED, QueueStatus.SERVING] },
+        status: { in: [QueueStatus.WAITING] },
+        queueDate: {
+          gte: todayStart,
+          lt: todayEnd,
+        },
       },
       orderBy: [{ calledAt: 'desc' }],
     });
@@ -380,7 +469,7 @@ export class CallService {
 
   private generateTTSText(queueNumber: string): string {
     const isReservation = queueNumber.startsWith('R');
-    const type = isReservation ? 'Reservasi' : 'Walk In';
+    const type = isReservation ? 'R' : 'W';
     const number = queueNumber.substring(1);
 
     return `Nomor antrian ${type} ${number}. Silakan menuju ke counter untuk dilayani.`;
@@ -388,7 +477,7 @@ export class CallService {
 
   private generateRecallTTSText(queueNumber: string): string {
     const isReservation = queueNumber.startsWith('R');
-    const type = isReservation ? 'Reservasi' : 'Walk In';
+    const type = isReservation ? 'R' : 'W';
     const number = queueNumber.substring(1);
 
     return `Panggilan ulang. Nomor antrian ${type} ${number}. Silakan segera menuju ke counter untuk dilayani.`;

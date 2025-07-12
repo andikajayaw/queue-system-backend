@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 import { DisplayService } from './display.service';
 
 @Controller('display')
@@ -17,13 +17,13 @@ export class DisplayController {
 
   @Get('recent-completed')
   async getRecentCompletedQueues(@Query('limit') limit?: string) {
-    const limitNum = limit ? parseInt(limit, 10) : 10;
+    const limitNum = 100;
     return this.displayService.getRecentCompletedQueues(limitNum);
   }
 
   @Get('next-waiting')
   async getNextWaitingQueues(@Query('limit') limit?: string) {
-    const limitNum = limit ? parseInt(limit, 10) : 5;
+    const limitNum = 100;
     return this.displayService.getNextWaitingQueues(limitNum);
   }
 }

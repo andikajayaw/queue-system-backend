@@ -76,7 +76,7 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     client.join(data.room);
-    this.logger.log(`Client ${client.id} joined room: ${data.room}`);
+    this.logger.log(`Client Call ${client.id} joined room: ${data.room}`);
 
     client.emit('joined-room', {
       success: true,
@@ -91,7 +91,7 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     client.leave(data.room);
-    this.logger.log(`Client ${client.id} left room: ${data.room}`);
+    this.logger.log(`Client Call ${client.id} left room: ${data.room}`);
 
     client.emit('left-room', {
       success: true,
@@ -140,20 +140,25 @@ export class CallGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Broadcast queue recall ke semua client
   broadcastQueueRecall(data: QueueRecallData) {
-    this.server.emit('queue-recalled', {
-      success: true,
-      data,
-      timestamp: new Date().toISOString(),
-    });
+    try {
+      console.log(data);
+      this.server.emit('queue-recalled', {
+        success: true,
+        data,
+        timestamp: new Date().toISOString(),
+      });
 
-    // Send ke display room khusus
-    this.server.to('display').emit('queue-recalled', {
-      success: true,
-      data,
-      timestamp: new Date().toISOString(),
-    });
+      // Send ke display room khusus
+      this.server.to('display').emit('queue-recalled', {
+        success: true,
+        data,
+        timestamp: new Date().toISOString(),
+      });
 
-    this.logger.log(`Broadcasting queue recall: ${data.queueNumber}`);
+      this.logger.log(`Broadcasting queue recall: ${data.queueNumber}`);
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   // Method untuk testing WebSocket connection

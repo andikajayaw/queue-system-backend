@@ -2,12 +2,15 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  BadRequestException, // ← TAMBAHKAN INI
+  InternalServerErrorException, // ← TAMBAHKAN INI
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { QueueType, QueueStatus } from '@prisma/client';
 import { CreateQueueDto } from './dto/create-queue.dto';
 import { UpdateQueueDto } from './dto/update-queue.dto';
 import { DisplayGateway } from '../display/display/display.gateway';
+import { startOfDay, endOfDay } from 'date-fns';
 
 @Injectable()
 export class QueueService {
@@ -19,36 +22,72 @@ export class QueueService {
   async createQueue(createQueueDto: CreateQueueDto) {
     const { type, customerName, phoneNumber } = createQueueDto;
 
-    // Generate queue number berdasarkan type
-    const queueNumber = await this.generateQueueNumber(type);
+    const now = new Date();
+    const queueDate = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
 
-    const queue = await this.prisma.queue.create({
-      data: {
-        queueNumber,
-        type,
-        customerName,
-        phoneNumber,
-        status: QueueStatus.WAITING,
-      },
-    });
+    if (type === QueueType.RESERVATION) {
+      // Validasi input
+      if (!type || !customerName) {
+        throw new BadRequestException('Type dan Customer Name wajib diisi');
+      }
+    }
+    const MAX_RETRIES = 3;
+    let attempt = 0;
 
-    const queueData = {
-      id: queue.id,
-      queueNumber: queue.queueNumber,
-      type: queue.type,
-      status: queue.status,
-      customerName: queue.customerName,
-      phoneNumber: queue.phoneNumber,
-      createdAt: queue.createdAt,
-    };
+    while (attempt < MAX_RETRIES) {
+      try {
+        // Generate queue number berdasarkan type
+        const queueNumber = await this.generateQueueNumber(type);
+        console.log(queueNumber);
 
-    await this.displayGateway.broadcastNewQueue(queueData);
+        const queue = await this.prisma.queue.create({
+          data: {
+            queueNumber,
+            type,
+            customerName,
+            phoneNumber,
+            status: QueueStatus.WAITING,
+            queueDate, // ← tambahkan ini
+          },
+        });
 
-    return {
-      success: true,
-      data: queue,
-      message: `Nomor antrian ${queueNumber} berhasil dibuat`,
-    };
+        const queueData = {
+          id: queue.id,
+          queueNumber: queue.queueNumber,
+          type: queue.type,
+          status: queue.status,
+          customerName: queue.customerName,
+          phoneNumber: queue.phoneNumber,
+          createdAt: queue.createdAt,
+        };
+
+        await this.displayGateway.broadcastNewQueue(queueData);
+
+        return {
+          success: true,
+          data: queue,
+          message: `Nomor antrian ${queueNumber} berhasil dibuat`,
+        };
+      } catch (error) {
+        console.error('Error creating queue:', error);
+
+        // Handle specific database errors
+        if (error.code === 'P2002') {
+          // Duplicate queueNumber → retry
+          attempt++;
+          if (attempt >= MAX_RETRIES) {
+            throw new ConflictException(
+              'Gagal membuat antrian: nomor sudah dipakai, silakan coba lagi',
+            );
+          }
+        } else {
+          console.error('Error creating queue:', error);
+          throw new InternalServerErrorException('Gagal membuat antrian');
+        }
+      }
+    }
   }
 
   async findAll(status?: QueueStatus, type?: QueueType) {
@@ -85,8 +124,17 @@ export class QueueService {
   }
 
   async findByQueueNumber(queueNumber: string) {
-    const queue = await this.prisma.queue.findUnique({
-      where: { queueNumber },
+    // const queue = await this.prisma.queue.findUnique({
+    //   where: { queueNumber },
+    // });
+    const queue = await this.prisma.queue.findFirst({
+      where: {
+        queueNumber,
+        queueDate: {
+          gte: startOfDay(new Date()),
+          lt: endOfDay(new Date()),
+        },
+      },
     });
 
     if (!queue) {
@@ -182,31 +230,42 @@ export class QueueService {
 
   // dashboard analytics
   async getDashboardStats() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
 
-    // Active queues (waiting)
+    // Active queues (waiting) based on queueDate
     const activeQueues = await this.prisma.queue.count({
       where: {
         status: QueueStatus.WAITING,
-        createdAt: {
-          gte: today,
-          lt: tomorrow,
+        queueDate: {
+          gte: todayStart,
+          lte: todayEnd,
         },
       },
     });
 
-    // Active staff (logged in today and active)
-    const activeStaff = await this.prisma.user.count({
+    // Active staff (logged in today and not logged out)
+    const loggedInUsers = await this.prisma.user.findMany({
       where: {
-        isActive: true,
-        role: { in: ['ADMIN', 'STAFF'] },
+        role: { in: ['STAFF'] },
+        lastLoginAt: {
+          gte: todayStart,
+          lt: todayEnd,
+        },
+      },
+      select: {
+        lastLoginAt: true,
+        lastLogoutAt: true,
       },
     });
 
-    // Top 3 staff by served queues today
+    const activeStaff = loggedInUsers.filter(
+      (u) =>
+        u.lastLoginAt !== null &&
+        (!u.lastLogoutAt || u.lastLoginAt > u.lastLogoutAt),
+    ).length;
+
+    // Top 3 staff by served queues today (based on queueDate)
     const topStaff = await this.prisma.user.findMany({
       select: {
         id: true,
@@ -217,9 +276,9 @@ export class QueueService {
             servedQueues: {
               where: {
                 status: QueueStatus.COMPLETED,
-                completedAt: {
-                  gte: today,
-                  lt: tomorrow,
+                queueDate: {
+                  gte: todayStart,
+                  lt: todayEnd,
                 },
               },
             },
@@ -230,9 +289,9 @@ export class QueueService {
         servedQueues: {
           some: {
             status: QueueStatus.COMPLETED,
-            completedAt: {
-              gte: today,
-              lt: tomorrow,
+            queueDate: {
+              gte: todayStart,
+              lt: todayEnd,
             },
           },
         },
@@ -251,10 +310,10 @@ export class QueueService {
       where: {
         status: QueueStatus.COMPLETED,
         serviceDuration: { not: null },
-        servedById: { not: null }, // Tambahkan filter untuk memastikan servedById tidak null
-        completedAt: {
-          gte: today,
-          lt: tomorrow,
+        servedById: { not: null },
+        queueDate: {
+          gte: todayStart,
+          lte: todayEnd,
         },
       },
       _avg: {
@@ -265,10 +324,9 @@ export class QueueService {
       },
     });
 
-    // Get staff details for service stats
     const validStaffIds = staffServiceStats
       .map((s) => s.servedById)
-      .filter((id): id is string => id !== null); // Type guard untuk memastikan tidak ada null
+      .filter((id): id is string => id !== null);
 
     const staffDetails = await this.prisma.user.findMany({
       where: {
@@ -327,32 +385,57 @@ export class QueueService {
   }
 
   private async generateQueueNumber(type: QueueType): Promise<string> {
+    const now = new Date();
+    const queueDate = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+
+    const prefix = type === QueueType.RESERVATION ? 'R' : 'W';
+
+    const existingQueues = await this.prisma.queue.findMany({
+      where: {
+        type,
+        queueNumber: {
+          startsWith: prefix,
+        },
+        queueDate,
+      },
+      select: {
+        queueNumber: true,
+      },
+      orderBy: {
+        queueNumber: 'asc',
+      },
+    });
+
+    const existingNumbers = existingQueues.map((q) => {
+      const numberStr = q.queueNumber.substring(1); // Remove R/W
+      return parseInt(numberStr, 10);
+    });
+
+    let nextNumber = 1;
+    while (existingNumbers.includes(nextNumber)) {
+      nextNumber++;
+    }
+
+    return `${prefix}${nextNumber.toString().padStart(3, '0')}`;
+  }
+
+  // Method untuk implementasi skema 2:1 (Reservasi:Walk-in)
+  async getNextQueueByPriority() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Count existing queues for today by type
-    const existingCount = await this.prisma.queue.count({
+    const waitingQueues = await this.prisma.queue.findMany({
       where: {
-        type,
-        createdAt: {
+        status: QueueStatus.WAITING,
+        queueDate: {
           gte: today,
           lt: tomorrow,
         },
       },
-    });
-
-    const prefix = type === QueueType.RESERVATION ? 'R' : 'W';
-    const number = (existingCount + 1).toString().padStart(3, '0');
-
-    return `${prefix}${number}`;
-  }
-
-  // Method untuk implementasi skema 2:1 (Reservasi:Walk-in)
-  async getNextQueueByPriority() {
-    const waitingQueues = await this.prisma.queue.findMany({
-      where: { status: QueueStatus.WAITING },
       orderBy: [{ createdAt: 'asc' }],
     });
 
@@ -367,12 +450,6 @@ export class QueueService {
     const walkInQueues = waitingQueues.filter(
       (q) => q.type === QueueType.WALK_IN,
     );
-
-    // Hitung berapa banyak yang sudah dipanggil hari ini
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
 
     const calledToday = await this.prisma.queue.count({
       where: {

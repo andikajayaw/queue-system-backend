@@ -1,98 +1,325 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Queue System Backend - Setup Guide
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## 📋 Deskripsi Proyek
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Sistem antrian berbasis NestJS dengan fitur real-time menggunakan WebSocket, autentikasi JWT, dan manajemen database PostgreSQL dengan Prisma ORM.
 
-## Description
+## 🔧 Persyaratan Sistem
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **Node.js**: v18.0.0 atau lebih baru
+- **npm**: v8.0.0 atau lebih baru
+- **PostgreSQL**: v13.0 atau lebih baru
+- **Git**: untuk version control
 
-## Project setup
+## 📥 Instalasi
+
+### 1. Clone Repository
 
 ```bash
-$ npm install
+git clone <repository-url>
+cd queue-system-backend
 ```
 
-## Compile and run the project
+### 2. Install Dependencies
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+### 3. Setup Database
+
+#### Buat Database PostgreSQL
+
+```sql
+-- Login ke PostgreSQL
+psql -U postgres
+
+-- Buat database baru
+CREATE DATABASE queue_system;
+
+-- Keluar dari psql
+\q
+```
+
+#### Konfigurasi Environment
+
+Buat file `.env` di root directory:
+
+```env
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/queue_system"
+
+# JWT
+JWT_SECRET="your-super-secret-jwt-key-here"
+
+# App Configuration
+NODE_ENV=development
+PORT=3000
+
+# Optional: Prisma Studio Port
+PRISMA_STUDIO_PORT=5555
+```
+
+**Catatan**: Ganti `username`, `password`, dan `your-super-secret-jwt-key-here` dengan nilai yang sesuai.
+
+### 4. Setup Prisma
+
+#### Generate Prisma Client
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run db:generate
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+#### Push Schema ke Database
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run db:push
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+#### Seed Database dengan Data Sample
 
-## Resources
+```bash
+npm run db:seed
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Seeder akan membuat:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+- 1 Admin user
+- 5 Staff users (4 aktif, 1 non-aktif)
+- Data historis antrian 30 hari terakhir
+- Data antrian hari ini dengan berbagai status
 
-## Support
+## 🚀 Menjalankan Aplikasi
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Development Mode
 
-## Stay in touch
+```bash
+npm run start:dev
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Production Mode
 
-## License
+```bash
+# Build aplikasi
+npm run build
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+# Jalankan production
+npm run start:prod
+```
+
+### Debug Mode
+
+```bash
+npm run start:debug
+```
+
+## 🔑 Akun Default
+
+Setelah menjalankan seeder, gunakan akun berikut untuk login:
+
+### Admin Account
+
+- **Username**: `admin`
+- **Password**: `admin123`
+- **Email**: `admin@hospital.com`
+
+### Staff Accounts
+
+- **Username**: `staff1` - `staff4`
+- **Password**: `staff123`
+- **Email**: `staff1@hospital.com` - `staff4@hospital.com`
+
+## 📊 Manajemen Database
+
+### Melihat Data (Prisma Studio)
+
+```bash
+npm run db:studio
+```
+
+Akan membuka browser di `http://localhost:5555`
+
+### Database Migration
+
+```bash
+# Membuat migration baru
+npm run db:migrate
+
+# Reset database (HATI-HATI: akan menghapus semua data)
+npx prisma migrate reset
+```
+
+### Re-seed Database
+
+```bash
+npm run db:seed
+```
+
+## 🔧 Scripts yang Tersedia
+
+| Script                | Deskripsi                          |
+| --------------------- | ---------------------------------- |
+| `npm run start`       | Menjalankan aplikasi               |
+| `npm run start:dev`   | Development mode dengan hot reload |
+| `npm run start:debug` | Debug mode                         |
+| `npm run start:prod`  | Production mode                    |
+| `npm run build`       | Build aplikasi untuk production    |
+| `npm run db:generate` | Generate Prisma Client             |
+| `npm run db:push`     | Push schema ke database            |
+| `npm run db:migrate`  | Jalankan database migration        |
+| `npm run db:studio`   | Buka Prisma Studio                 |
+| `npm run db:seed`     | Seed database dengan data sample   |
+| `npm run lint`        | Lint dan fix kode                  |
+| `npm run format`      | Format kode dengan Prettier        |
+
+## 📚 Fitur Utama
+
+### Authentication & Authorization
+
+- JWT-based authentication
+- Role-based access control (Admin/Staff)
+- Login/logout tracking
+
+### Queue Management
+
+- Dua jenis antrian: Reservation dan Walk-in
+- Status antrian: WAITING, CALLED, SERVING, COMPLETED, CANCELLED
+- Auto-assignment staff ketika antrian dipanggil
+
+### Real-time Updates
+
+- WebSocket untuk update real-time
+- Notifikasi status antrian
+- Dashboard live monitoring
+
+### Reporting & Analytics
+
+- Statistik harian, mingguan, bulanan
+- Performance tracking per staff
+- Service duration analytics
+
+## 🌐 API Endpoints
+
+### Authentication
+
+- `POST /auth/login` - Login
+- `POST /auth/logout` - Logout
+- `GET /auth/profile` - Get user profile
+
+### Queue Management
+
+- `GET /queues` - Get all queues
+- `POST /queues` - Create new queue
+- `PUT /queues/:id` - Update queue
+- `DELETE /queues/:id` - Delete queue
+
+### User Management (Admin only)
+
+- `GET /users` - Get all users
+- `POST /users` - Create user
+- `PUT /users/:id` - Update user
+- `DELETE /users/:id` - Delete user
+
+### Analytics
+
+- `GET /analytics/dashboard` - Dashboard statistics
+- `GET /analytics/staff-performance` - Staff performance
+- `GET /analytics/queue-trends` - Queue trends
+
+## 🔧 Troubleshooting
+
+### Database Connection Error
+
+```bash
+# Pastikan PostgreSQL berjalan
+sudo systemctl start postgresql
+
+# Atau untuk macOS
+brew services start postgresql
+```
+
+### Prisma Generate Error
+
+```bash
+# Hapus dan regenerate
+rm -rf node_modules/.prisma
+npm run db:generate
+```
+
+### Port Already in Use
+
+```bash
+# Ubah port di file .env
+PORT=3001
+```
+
+### Reset Database Completely
+
+```bash
+npx prisma migrate reset
+npm run db:seed
+```
+
+## 📁 Struktur Proyek
+
+```
+queue-system-backend/
+├── src/
+│   ├── auth/          # Authentication module
+│   ├── queues/        # Queue management
+│   ├── users/         # User management
+│   ├── analytics/     # Analytics & reporting
+│   ├── common/        # Shared utilities
+│   └── main.ts        # Application entry point
+├── prisma/
+│   ├── schema.prisma  # Database schema
+│   └── seed.ts        # Database seeder
+├── .env               # Environment variables
+├── package.json       # Dependencies
+└── README.md         # This file
+```
+
+## 🔒 Keamanan
+
+- Password di-hash menggunakan bcrypt (salt rounds: 12)
+- JWT tokens dengan expiration time
+- Role-based access control
+- Input validation dengan class-validator
+- CORS configuration
+
+## 🚀 Deployment
+
+### Environment Variables untuk Production
+
+```env
+NODE_ENV=production
+DATABASE_URL="postgresql://user:password@host:port/database"
+JWT_SECRET="your-very-secure-secret"
+PORT=3000
+```
+
+### Build & Deploy
+
+```bash
+# Build aplikasi
+npm run build
+
+# Jalankan migration di production
+npx prisma migrate deploy
+
+# Start production server
+npm run start:prod
+```
+
+## 📞 Support
+
+Jika mengalami masalah:
+
+1. Periksa log error di console
+2. Pastikan semua environment variables sudah diset
+3. Verifikasi koneksi database
+4. Cek apakah semua dependencies sudah terinstall
+
+---
+
+**Selamat menggunakan Queue System Backend!** 🎉

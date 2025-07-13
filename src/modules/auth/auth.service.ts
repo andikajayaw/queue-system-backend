@@ -88,7 +88,7 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_SECRET'),
-      expiresIn: '5m', // atau berapa pun kamu inginkan
+      expiresIn: '24h', // atau berapa pun kamu inginkan
     });
 
     const refreshToken = this.jwtService.sign(payload, {
@@ -203,7 +203,7 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_SECRET'),
-      expiresIn: '5m',
+      expiresIn: '24h',
     });
 
     const refreshToken = this.jwtService.sign(payload, {

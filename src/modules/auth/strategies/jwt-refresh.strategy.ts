@@ -18,6 +18,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
           // Ambil token dari cookie 'refresh_token'
           return req?.cookies?.refresh_token;
         },
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_REFRESH_SECRET') as string, // Gunakan secret berbeda dari accessToken

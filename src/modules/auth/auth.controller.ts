@@ -41,6 +41,7 @@ export class AuthController {
       httpOnly: true,
       secure: false, // false kalau masih lokal tanpa HTTPS
       sameSite: 'lax', // lebih fleksibel daripada 'strict'
+      path: '/',
       maxAge: 5 * 60 * 1000,
     });
 
@@ -94,6 +95,7 @@ export class AuthController {
       httpOnly: true,
       secure: false, // false kalau masih lokal tanpa HTTPS
       sameSite: 'lax', // lebih fleksibel daripada 'strict'
+      path: '/',
       maxAge: 5 * 60 * 1000,
     });
 

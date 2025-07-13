@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -22,42 +23,71 @@ export class AuthService {
   async register(registerDto: RegisterDto) {
     const { email, username, name, password, role = Role.STAFF } = registerDto;
 
-    // Check if user exists
-    const existingUser = await this.prisma.user.findUnique({
+    // Validasi input
+    if (!name?.trim()) {
+      throw new BadRequestException('Nama wajib diisi');
+    }
+    if (!username?.trim()) {
+      throw new BadRequestException('Username wajib diisi');
+    }
+    if (!email?.trim()) {
+      throw new BadRequestException('Email wajib diisi');
+    }
+    if (!password) {
+      throw new BadRequestException('Password wajib diisi');
+    }
+
+    // Check if email already exists
+    const existingUserByEmail = await this.prisma.user.findUnique({
       where: { email },
     });
 
-    if (existingUser) {
+    if (existingUserByEmail) {
       throw new ConflictException('Email sudah terdaftar');
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        username,
-        name,
-        password: hashedPassword,
-        role,
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      },
+    // Check if username already exists
+    const existingUserByUsername = await this.prisma.user.findUnique({
+      where: { username },
     });
 
-    return {
-      message: 'User berhasil didaftarkan',
-      user,
-    };
+    if (existingUserByUsername) {
+      throw new ConflictException('Username sudah terdaftar');
+    }
+
+    try {
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user
+      const user = await this.prisma.user.create({
+        data: {
+          email: email.trim(),
+          username: username.trim(),
+          name: name.trim(),
+          password: hashedPassword,
+          role,
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'User berhasil didaftarkan',
+        data: user,
+      };
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw new BadRequestException('Gagal mendaftarkan user');
+    }
   }
 
   async login(loginDto: LoginDto) {

@@ -22,8 +22,8 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN) // Hanya admin yang bisa register user baru
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles(Role.ADMIN) // in case dibutuhkan untuk management user lewat dashboard
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }

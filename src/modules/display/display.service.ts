@@ -266,7 +266,7 @@ export class DisplayService {
   async getRecentCompletedQueues(limit: number) {
     const todayStart = startOfDay(new Date());
     const todayEnd = endOfDay(new Date());
-    
+
     const completedQueues = await this.prisma.queue.findMany({
       where: {
         status: 'COMPLETED',
@@ -308,7 +308,7 @@ export class DisplayService {
     }));
   }
 
-  async getNextWaitingQueues(limit: number) {
+  async getNextWaitingQueues(limit: number = 5) {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 

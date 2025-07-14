@@ -190,7 +190,7 @@ export class CallService {
           timestamp: new Date().toISOString(),
         },
       };
-    } catch (err) {
+    } catch {
       return {
         success: false,
         message:
@@ -272,7 +272,7 @@ export class CallService {
     };
 
     // Broadcast via WebSocket
-    await this.callGateway.broadcastQueueUpdate(queueData);
+    this.callGateway.broadcastQueueUpdate(queueData);
 
     // Broadcast to display clients
     await this.displayGateway.broadcastQueueServing(queueData);
@@ -333,7 +333,7 @@ export class CallService {
     };
 
     // Broadcast via WebSocket
-    await this.callGateway.broadcastQueueUpdate(queueData);
+    this.callGateway.broadcastQueueUpdate(queueData);
 
     // Broadcast to display clients
     await this.displayGateway.broadcastQueueCompleted(queueData);

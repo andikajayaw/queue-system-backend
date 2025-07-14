@@ -8,18 +8,15 @@ export class DisplayService {
   constructor(private prisma: PrismaService) {}
 
   async getCurrentCalledQueues() {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
 
     const calledQueues = await this.prisma.queue.findMany({
       where: {
         status: 'CALLED',
         queueDate: {
-          gte: startOfDay,
-          lte: endOfDay,
+          gte: todayStart,
+          lte: todayEnd,
         },
       },
       include: {

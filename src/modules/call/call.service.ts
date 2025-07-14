@@ -175,7 +175,7 @@ export class CallService {
         type: updatedQueue.type,
         calledAt: updatedQueue.calledAt,
         ttsText,
-        servedBy: updatedQueue.servedBy,
+        staff: updatedQueue.servedBy,
       };
 
       this.callGateway.broadcastQueueCall(queueData);
@@ -458,6 +458,15 @@ export class CallService {
         },
       },
       orderBy: [{ calledAt: 'desc' }],
+      include: {
+        servedBy: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          },
+        },
+      },
     });
 
     return {
